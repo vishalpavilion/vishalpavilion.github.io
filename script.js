@@ -114,6 +114,121 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 2. WHATSAPP FORM LOGIC
     const bookingForm = document.getElementById('whatsappForm');
+
+    // --- BOOKING PRICING HELPERS (added) ---
+    // Deluxe Room: base price is for 2 adults. Mon-Fri base = 1500, Sat-Sun base = 3000.
+    // Every adult beyond 2 adds a flat 500 surcharge (e.g. 3 adults on a weekday = 2000,
+    // 3 adults on a weekend = 3500).
+    // Party Hall: always a fixed 20,000, no per-adult calculation.
+    const BASE_ADULTS = 2;
+    const EXTRA_ADULT_CHARGE = 500;
+
+    const getBookingAmount = (type, dateValue, adultsValue) => {
+        if (type === 'Party Hall') {
+            return 20000;
+        }
+        if (!dateValue) return 0;
+
+        // Parse the yyyy-mm-dd value manually as a LOCAL date to avoid any
+        // UTC/timezone day-shift issues from `new Date("yyyy-mm-dd")`.
+        const [year, month, day] = dateValue.split('-').map(Number);
+        const localDate = new Date(year, month - 1, day);
+        const dayOfWeek = localDate.getDay(); // 0 = Sunday, 6 = Saturday
+        const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+        const baseAmount = isWeekend ? 3000 : 1500;
+
+        const adults = parseInt(adultsValue, 10) || BASE_ADULTS;
+        const extraAdults = Math.max(0, adults - BASE_ADULTS);
+
+        return baseAmount + (extraAdults * EXTRA_ADULT_CHARGE);
+    };
+
+    // Format a yyyy-mm-dd value as "15 August 2026"
+    const formatBookingDate = (dateValue) => {
+        const [year, month, day] = dateValue.split('-').map(Number);
+        const localDate = new Date(year, month - 1, day);
+        return localDate.toLocaleDateString('en-GB', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+        });
+    };
+
+    // Restrict the date pickers so users can only pick today or a future date.
+    // Computed fresh from the real-time current date, so it works correctly
+    // every day/year without any code changes.
+    const setMinDateToday = () => {
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        const todayStr = `${yyyy}-${mm}-${dd}`;
+
+        const checkInEl = document.getElementById('checkIn');
+        const checkOutEl = document.getElementById('checkOut');
+        if (checkInEl) checkInEl.setAttribute('min', todayStr);
+        if (checkOutEl) checkOutEl.setAttribute('min', todayStr);
+    };
+    setMinDateToday();
+
+    // --- LIVE TOTAL AMOUNT DISPLAY (added) ---
+    const stayTypeEl = document.getElementById('stayType');
+    const checkInEl = document.getElementById('checkIn');
+    const adultsEl = document.getElementById('adults');
+    const totalAmountBox = document.getElementById('totalAmountBox');
+    const totalAmountValue = document.getElementById('totalAmountValue');
+
+    const refreshTotalAmount = () => {
+        const type = stayTypeEl.value;
+        const dateValue = checkInEl.value;
+        const adultsValue = adultsEl.value;
+
+        // Only show the total once we have enough info to calculate it
+        // (date is required for Deluxe Room; Party Hall only needs the type).
+        const hasEnoughInfo = (type === 'Party Hall') || (dateValue && adultsValue);
+
+        if (!hasEnoughInfo) {
+            totalAmountBox.style.display = 'none';
+            return;
+        }
+
+        const amount = getBookingAmount(type, dateValue, adultsValue);
+        totalAmountValue.textContent = `₹${amount.toLocaleString('en-IN')}`;
+        totalAmountBox.style.display = 'flex';
+    };
+
+    if (stayTypeEl) stayTypeEl.addEventListener('change', refreshTotalAmount);
+    if (checkInEl) checkInEl.addEventListener('change', refreshTotalAmount);
+    if (adultsEl) adultsEl.addEventListener('input', refreshTotalAmount);
+    // --- END LIVE TOTAL AMOUNT DISPLAY ---
+
+    // --- SYNC MODAL WITH THE CLICKED CARD (added) ---
+    // Both "View Details" buttons (Deluxe Room card & Party Hall card) open the
+    // SAME #bookModal. Without this, the dropdown always defaulted to whatever
+    // option is first in the <select> ("Deluxe Room"), even when the Party Hall
+    // button was clicked. This reads which button triggered the modal and sets
+    // the dropdown to match automatically.
+    const bookModalEl = document.getElementById('bookModal');
+    if (bookModalEl) {
+        bookModalEl.addEventListener('show.bs.modal', (e) => {
+            const trigger = e.relatedTarget;
+            const requestedType = trigger ? trigger.getAttribute('data-stay-type') : null;
+
+            if (requestedType && stayTypeEl) {
+                stayTypeEl.value = requestedType;
+                // Fire the existing change handlers (updates the
+                // adults/guests label AND the live total amount box)
+                stayTypeEl.dispatchEvent(new Event('change'));
+            } else {
+                // Buttons without a specific type (e.g. the general
+                // "BOOK YOUR ROYAL STAY NOW" / "INITIATE ENQUIRY" CTAs)
+                // just refresh the display for whatever is currently selected.
+                refreshTotalAmount();
+            }
+        });
+    }
+    // --- END SYNC MODAL WITH THE CLICKED CARD ---
+    // --- END BOOKING PRICING HELPERS ---
     
     bookingForm.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -123,6 +238,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const checkOut = document.getElementById('checkOut').value;
         const adults = document.getElementById('adults').value;
         const request = document.getElementById('specialRequest').value || "None";
+
+        // Guard: block any accidental past-date submission (defense in depth
+        // alongside the native min-date restriction on the input itself)
+        const [ciY, ciM, ciD] = checkIn.split('-').map(Number);
+        const selectedLocalDate = new Date(ciY, ciM - 1, ciD);
+        const todayLocal = new Date();
+        todayLocal.setHours(0, 0, 0, 0);
+        if (selectedLocalDate < todayLocal) {
+            alert('Please select today or a future check-in date.');
+            return;
+        }
+
+        // Calculate booking amount (also shown live on the page above)
+        const bookingAmount = getBookingAmount(type, checkIn, adults);
+        const formattedAmount = bookingAmount.toLocaleString('en-IN');
+        const formattedDate = formatBookingDate(checkIn);
         
         const phoneNumber = "919443058306";
         
@@ -131,6 +262,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         `*Check-In:* ${checkIn}%0a` +
                         `*Check-Out:* ${checkOut}%0a` +
                         `*Adults:* ${adults}%0a` +
+                        `*Booking Date:* ${formattedDate}%0a` +
+                        `*Total Amount:* ₹${formattedAmount}%0a` +
                         `*Special Request:* ${request}`;
         
         const whatsappUrl = `https://api.whatsapp.com/send?phone=${phoneNumber}&text=${message}`;
