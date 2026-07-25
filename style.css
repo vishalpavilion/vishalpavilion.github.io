@@ -788,3 +788,27 @@ body.loading .imperial-nav { display: none !important; }
         margin-right: 5px;
     }
 }
+
+/* --- LIVE TOTAL AMOUNT DISPLAY (added) --- */
+.total-amount-box {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(197, 160, 89, 0.08);
+    border: 1px solid var(--gold);
+    padding: 12px 16px;
+}
+
+.total-amount-label {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.75rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--gold);
+}
+
+.total-amount-value {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 1.1rem;
+    color: var(--gold-bright);
+}
