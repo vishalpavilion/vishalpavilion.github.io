@@ -147,7 +147,7 @@
                             <span><i class="fas fa-snowflake"></i> AC & Heating</span>
                         </div>
                         <p class="small text-white-50">Spacious double room with electric kettle, and flat-screen TV. Perfect for a royal stay.</p>
-                        <button class="btn-royal-sm mt-3" data-bs-toggle="modal" data-bs-target="#bookModal">View Details</button>
+                        <button class="btn-royal-sm mt-3" data-bs-toggle="modal" data-bs-target="#bookModal" data-stay-type="Deluxe Room">View Details</button>
                     </div>
                 </div>
             </div>
@@ -172,7 +172,7 @@
                             <span><i class="fas fa-utensils"></i> Catering Ready</span>
                         </div>
                         <p class="small text-white-50">Celebrate your life's milestones in a venue draped in velvet and gold. Perfect for birthdays and family gatherings.</p>
-                        <button class="btn-royal-sm mt-3" data-bs-toggle="modal" data-bs-target="#bookModal">View Details</button>
+                        <button class="btn-royal-sm mt-3" data-bs-toggle="modal" data-bs-target="#bookModal" data-stay-type="Party Hall">View Details</button>
                     </div>
                 </div>
             </div>
@@ -215,6 +215,13 @@
                         <label class="form-label small gold-text" id="occupancyLabel">Number of Adults</label>
                         <input type="number" class="form-control royal-input" id="adults" min="1" required>
                     </div>
+
+                    <!-- LIVE TOTAL AMOUNT DISPLAY (added) -->
+                    <div class="mb-3 total-amount-box" id="totalAmountBox" style="display:none;">
+                        <span class="total-amount-label">Total Amount</span>
+                        <span class="total-amount-value" id="totalAmountValue">₹0</span>
+                    </div>
+
                     <div class="mb-3">
                         <label class="form-label small gold-text">Special Request (Optional)</label>
                         <textarea class="form-control royal-input" id="specialRequest" rows="2" placeholder="Any royal preferences?"></textarea>
