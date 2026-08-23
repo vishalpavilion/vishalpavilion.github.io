@@ -812,3 +812,190 @@ body.loading .imperial-nav { display: none !important; }
     font-size: 1.1rem;
     color: var(--gold-bright);
 }
+
+/* ============================================================
+   ROYAL ENHANCEMENT PACK — extra animation & imperial FX
+   ============================================================ */
+
+/* Shimmering gold sweep across the hero title, like light on gilt lettering */
+.main-title {
+    background: linear-gradient(100deg, var(--gold) 20%, var(--gold-bright) 40%, #fff8dc 50%, var(--gold-bright) 60%, var(--gold) 80%);
+    background-size: 250% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: royalShimmer 6s linear infinite;
+    text-shadow: 0 0 40px rgba(197, 160, 89, 0.35);
+}
+
+@keyframes royalShimmer {
+    0% { background-position: 0% center; }
+    100% { background-position: -250% center; }
+}
+
+/* Gentle royal glow pulse around the imperial frame */
+.imperial-frame {
+    animation: frameGlow 4s ease-in-out infinite;
+}
+
+@keyframes frameGlow {
+    0%, 100% { box-shadow: 0 0 25px rgba(197, 160, 89, 0.15); }
+    50% { box-shadow: 0 0 50px rgba(197, 160, 89, 0.4); }
+}
+
+/* Divider grows in with a shimmer sweep instead of appearing static */
+.gold-divider {
+    position: relative;
+    overflow: hidden;
+    animation: dividerGrow 1.4s cubic-bezier(0.2, 1, 0.3, 1) both;
+}
+
+.gold-divider::after {
+    content: '';
+    position: absolute;
+    top: 0; left: -50%;
+    width: 50%; height: 100%;
+    background: linear-gradient(90deg, transparent, var(--gold-bright), transparent);
+    animation: dividerSweep 3s ease-in-out infinite;
+    animation-delay: 1.5s;
+}
+
+@keyframes dividerGrow { from { width: 0; opacity: 0; } to { width: 80px; opacity: 1; } }
+@keyframes dividerSweep { 0% { left: -50%; } 100% { left: 150%; } }
+
+/* Floating gold sparkle particles drifting up through the hero */
+.royal-sparkle-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 1;
+}
+
+.royal-sparkle {
+    position: absolute;
+    bottom: -10px;
+    width: 4px;
+    height: 4px;
+    background: var(--gold-bright);
+    border-radius: 50%;
+    box-shadow: 0 0 6px 2px rgba(249, 226, 125, 0.8);
+    opacity: 0;
+    animation-name: sparkleRise;
+    animation-timing-function: ease-in;
+    animation-iteration-count: 1;
+}
+
+@keyframes sparkleRise {
+    0% { transform: translate(0, 0) scale(0.5); opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 0.8; }
+    100% { transform: translate(var(--drift), -100vh) scale(1.1); opacity: 0; }
+}
+
+/* Imperial seal breathes gently, like a wax stamp catching light */
+.imperial-seal {
+    animation: sealPulse 3.5s ease-in-out infinite;
+}
+
+@keyframes sealPulse {
+    0%, 100% { box-shadow: 0 10px 20px rgba(0,0,0,0.3), 0 0 0 rgba(197,160,89,0); }
+    50% { box-shadow: 0 10px 25px rgba(0,0,0,0.35), 0 0 20px rgba(197,160,89,0.5); }
+}
+
+/* Ornamental feather icon sways subtly between the divider lines */
+.imperial-ornament i {
+    display: inline-block;
+    animation: featherSway 3s ease-in-out infinite;
+}
+
+@keyframes featherSway {
+    0%, 100% { transform: rotate(-8deg); }
+    50% { transform: rotate(8deg); }
+}
+
+/* Luxury room/hall cards get a slow-traveling gold border glow */
+.luxury-card-3d {
+    position: relative;
+}
+
+.luxury-card-3d::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    background: conic-gradient(from 0deg, transparent 0%, var(--gold-bright) 8%, transparent 16%);
+    opacity: 0;
+    transition: opacity 0.6s;
+    animation: cardBorderSpin 5s linear infinite;
+    pointer-events: none;
+    z-index: -1;
+}
+
+.luxury-card-3d:hover::before {
+    opacity: 0.5;
+}
+
+@keyframes cardBorderSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Section headings ease in from below with a soft royal fade */
+.royal-display-title {
+    animation: titleRise 1s cubic-bezier(0.2, 1, 0.3, 1) both;
+}
+
+@keyframes titleRise {
+    from { opacity: 0; transform: translateY(25px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Wax seal mini medallions on the contact cards pulse subtly */
+.wax-seal-mini {
+    animation: sealPulse 4s ease-in-out infinite;
+}
+
+/* Filter buttons get a soft shimmer sweep when active */
+.filter-btn.active {
+    position: relative;
+    overflow: hidden;
+}
+
+.filter-btn.active::after {
+    content: '';
+    position: absolute;
+    top: 0; left: -60%;
+    width: 60%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+    animation: dividerSweep 2.5s ease-in-out infinite;
+}
+
+/* Total amount box glows briefly whenever it updates */
+.total-amount-box {
+    animation: totalGlow 0.6s ease-out;
+}
+
+@keyframes totalGlow {
+    0% { box-shadow: 0 0 0 rgba(249, 226, 125, 0); background: rgba(197, 160, 89, 0.25); }
+    100% { box-shadow: 0 0 18px rgba(249, 226, 125, 0.35); background: rgba(197, 160, 89, 0.08); }
+}
+
+/* Navbar brand gets a soft gold glow breathing effect */
+.navbar-brand {
+    animation: brandGlow 5s ease-in-out infinite;
+}
+
+@keyframes brandGlow {
+    0%, 100% { text-shadow: 0 0 6px rgba(197, 160, 89, 0.2); }
+    50% { text-shadow: 0 0 16px rgba(249, 226, 125, 0.6); }
+}
+
+/* Respect users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .main-title, .imperial-frame, .gold-divider::after, .royal-sparkle,
+    .imperial-seal, .imperial-ornament i, .luxury-card-3d::before,
+    .royal-display-title, .wax-seal-mini, .filter-btn.active::after,
+    .total-amount-box, .navbar-brand {
+        animation: none !important;
+    }
+}
