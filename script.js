@@ -115,32 +115,54 @@ document.addEventListener('DOMContentLoaded', () => {
     // 2. WHATSAPP FORM LOGIC
     const bookingForm = document.getElementById('whatsappForm');
 
-    // --- BOOKING PRICING HELPERS (added) ---
-    // Deluxe Room: base price is for 2 adults. Mon-Fri base = 1500, Sat-Sun base = 3000.
-    // Every adult beyond 2 adds a flat 500 surcharge (e.g. 3 adults on a weekday = 2000,
-    // 3 adults on a weekend = 3500).
-    // Party Hall: always a fixed 20,000, no per-adult calculation.
-    const BASE_ADULTS = 2;
-    const EXTRA_ADULT_CHARGE = 500;
+    // --- DYNAMIC CLOUD DATABASE ENGINE PRICING LOGIC ---
+    let extraMattressPriceCached = 500;
+    let deluxeRulesCached = [];
+    let hallRulesCached = [];
+
+    const initializeLivePriceEngines = () => {
+        db.collection("configuration").doc("pricing_config").onSnapshot((doc) => {
+            if (doc.exists) {
+                extraMattressPriceCached = doc.data().extra_mattress_price || 0;
+            }
+            refreshTotalAmount();
+        });
+
+        db.collection("deluxe_rules").onSnapshot((snapshot) => {
+            deluxeRulesCached = [];
+            snapshot.forEach(doc => deluxeRulesCached.push(doc.data()));
+            refreshTotalAmount();
+        });
+
+        db.collection("party_hall_rules").onSnapshot((snapshot) => {
+            hallRulesCached = [];
+            snapshot.forEach(doc => hallRulesCached.push(doc.data()));
+            refreshTotalAmount();
+        });
+    };
+    initializeLivePriceEngines();
 
     const getBookingAmount = (type, dateValue, adultsValue) => {
-        if (type === 'Party Hall') {
-            return 20000;
-        }
         if (!dateValue) return 0;
 
-        // Parse the yyyy-mm-dd value manually as a LOCAL date to avoid any
-        // UTC/timezone day-shift issues from `new Date("yyyy-mm-dd")`.
-        const [year, month, day] = dateValue.split('-').map(Number);
-        const localDate = new Date(year, month - 1, day);
-        const dayOfWeek = localDate.getDay(); // 0 = Sunday, 6 = Saturday
-        const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
-        const baseAmount = isWeekend ? 3000 : 1500;
+        const targetRules = type === 'Party Hall' ? hallRulesCached : deluxeRulesCached;
+        
+        let customMatchedAmount = null;
+        targetRules.forEach(rule => {
+            if (dateValue >= rule.startDate && dateValue <= rule.endDate) {
+                customMatchedAmount = parseInt(rule.amount, 10);
+            }
+        });
 
-        const adults = parseInt(adultsValue, 10) || BASE_ADULTS;
-        const extraAdults = Math.max(0, adults - BASE_ADULTS);
+        if (type === 'Party Hall') {
+            return customMatchedAmount !== null ? customMatchedAmount : 20000;
+        }
 
-        return baseAmount + (extraAdults * EXTRA_ADULT_CHARGE);
+        const baseAmount = customMatchedAmount !== null ? customMatchedAmount : 1500;
+        const adults = parseInt(adultsValue, 10) || 2;
+        const extraAdults = Math.max(0, adults - 2);
+
+        return baseAmount + (extraAdults * extraMattressPriceCached);
     };
 
     // Format a yyyy-mm-dd value as "15 August 2026"
@@ -155,8 +177,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Restrict the date pickers so users can only pick today or a future date.
-    // Computed fresh from the real-time current date, so it works correctly
-    // every day/year without any code changes.
     const setMinDateToday = () => {
         const now = new Date();
         const yyyy = now.getFullYear();
@@ -171,7 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     setMinDateToday();
 
-    // --- LIVE TOTAL AMOUNT DISPLAY (added) ---
+    // --- LIVE TOTAL AMOUNT DISPLAY ---
     const stayTypeEl = document.getElementById('stayType');
     const checkInEl = document.getElementById('checkIn');
     const adultsEl = document.getElementById('adults');
@@ -179,35 +199,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const totalAmountValue = document.getElementById('totalAmountValue');
 
     const refreshTotalAmount = () => {
+        if (!stayTypeEl || !checkInEl || !adultsEl) return;
         const type = stayTypeEl.value;
         const dateValue = checkInEl.value;
         const adultsValue = adultsEl.value;
 
-        // Only show the total once we have enough info to calculate it
-        // (date is required for Deluxe Room; Party Hall only needs the type).
         const hasEnoughInfo = (type === 'Party Hall') || (dateValue && adultsValue);
 
         if (!hasEnoughInfo) {
-            totalAmountBox.style.display = 'none';
+            if (totalAmountBox) totalAmountBox.style.display = 'none';
             return;
         }
 
         const amount = getBookingAmount(type, dateValue, adultsValue);
-        totalAmountValue.textContent = `₹${amount.toLocaleString('en-IN')}`;
-        totalAmountBox.style.display = 'flex';
+        if (totalAmountValue) totalAmountValue.textContent = `₹${amount.toLocaleString('en-IN')}`;
+        if (totalAmountBox) totalAmountBox.style.display = 'flex';
     };
 
     if (stayTypeEl) stayTypeEl.addEventListener('change', refreshTotalAmount);
     if (checkInEl) checkInEl.addEventListener('change', refreshTotalAmount);
     if (adultsEl) adultsEl.addEventListener('input', refreshTotalAmount);
-    // --- END LIVE TOTAL AMOUNT DISPLAY ---
 
-    // --- SYNC MODAL WITH THE CLICKED CARD (added) ---
-    // Both "View Details" buttons (Deluxe Room card & Party Hall card) open the
-    // SAME #bookModal. Without this, the dropdown always defaulted to whatever
-    // option is first in the <select> ("Deluxe Room"), even when the Party Hall
-    // button was clicked. This reads which button triggered the modal and sets
-    // the dropdown to match automatically.
+    // --- SYNC MODAL WITH THE CLICKED CARD ---
     const bookModalEl = document.getElementById('bookModal');
     if (bookModalEl) {
         bookModalEl.addEventListener('show.bs.modal', (e) => {
@@ -216,19 +229,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (requestedType && stayTypeEl) {
                 stayTypeEl.value = requestedType;
-                // Fire the existing change handlers (updates the
-                // adults/guests label AND the live total amount box)
                 stayTypeEl.dispatchEvent(new Event('change'));
             } else {
-                // Buttons without a specific type (e.g. the general
-                // "BOOK YOUR ROYAL STAY NOW" / "INITIATE ENQUIRY" CTAs)
-                // just refresh the display for whatever is currently selected.
                 refreshTotalAmount();
             }
         });
     }
-    // --- END SYNC MODAL WITH THE CLICKED CARD ---
-    // --- END BOOKING PRICING HELPERS ---
     
     bookingForm.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -239,8 +245,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const adults = document.getElementById('adults').value;
         const request = document.getElementById('specialRequest').value || "None";
 
-        // Guard: block any accidental past-date submission (defense in depth
-        // alongside the native min-date restriction on the input itself)
         const [ciY, ciM, ciD] = checkIn.split('-').map(Number);
         const selectedLocalDate = new Date(ciY, ciM - 1, ciD);
         const todayLocal = new Date();
@@ -250,12 +254,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Calculate booking amount (also shown live on the page above)
         const bookingAmount = getBookingAmount(type, checkIn, adults);
         const formattedAmount = bookingAmount.toLocaleString('en-IN');
         const formattedDate = formatBookingDate(checkIn);
         
-        const phoneNumber = "919443058306";
+        const phoneNumber = "916379028897"; // Replace with your WhatsApp number
         
         const message = `*Enquiry - Vishal Pavilion*%0a%0a` +
                         `*Selection:* ${type}%0a` +
@@ -264,6 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         `*Adults:* ${adults}%0a` +
                         `*Booking Date:* ${formattedDate}%0a` +
                         `*Total Amount:* ₹${formattedAmount}%0a` +
+                        `*Extra Mattress:* ₹${extraMattressPriceCached}%0a` +
                         `*Special Request:* ${request}`;
         
         const whatsappUrl = `https://api.whatsapp.com/send?phone=${phoneNumber}&text=${message}`;
@@ -274,13 +278,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const stayType = document.getElementById('stayType');
     const label = document.getElementById('occupancyLabel');
     
-    stayType.addEventListener('change', () => {
-        if(stayType.value === "Party Hall") {
-            label.innerText = "Estimated Number of Guests";
-        } else {
-            label.innerText = "Number of Adults";
-        }
-    });
+    if (stayType && label) {
+        stayType.addEventListener('change', () => {
+            if(stayType.value === "Party Hall") {
+                label.innerText = "Estimated Number of Guests";
+            } else {
+                label.innerText = "Number of Adults";
+            }
+        });
+    }
 });
 
 
@@ -303,7 +309,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }, { threshold: 0.15 });
-    galleryObserver.observe(gallerySection);
+    if (gallerySection) galleryObserver.observe(gallerySection);
 
     // 2. CATEGORY FILTERING
     filterBtns.forEach(btn => {
@@ -329,34 +335,48 @@ document.addEventListener('DOMContentLoaded', () => {
         item.addEventListener('click', () => {
             currentImgIndex = index;
             showImage(index);
-            lightbox.style.display = 'flex';
+            if (lightbox) lightbox.style.display = 'flex';
         });
     });
 
     const showImage = (index) => {
+        if (!galleryItems[index]) return;
         const src = galleryItems[index].querySelector('img').src;
-        lightboxImg.src = src;
+        if (lightboxImg) lightboxImg.src = src;
     };
 
-    document.querySelector('.close-lightbox').addEventListener('click', () => lightbox.style.display = 'none');
+    const closeBtn = document.querySelector('.close-lightbox');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            if (lightbox) lightbox.style.display = 'none';
+        });
+    }
     
-    document.querySelector('.next-lightbox').addEventListener('click', () => {
-        currentImgIndex = (currentImgIndex + 1) % galleryItems.length;
-        showImage(currentImgIndex);
-    });
+    const nextBtn = document.querySelector('.next-lightbox');
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            currentImgIndex = (currentImgIndex + 1) % galleryItems.length;
+            showImage(currentImgIndex);
+        });
+    }
 
-    document.querySelector('.prev-lightbox').addEventListener('click', () => {
-        currentImgIndex = (currentImgIndex - 1 + galleryItems.length) % galleryItems.length;
-        showImage(currentImgIndex);
-    });
+    const prevBtn = document.querySelector('.prev-lightbox');
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+            currentImgIndex = (currentImgIndex - 1 + galleryItems.length) % galleryItems.length;
+            showImage(currentImgIndex);
+        });
+    }
 
     // SWIPE SUPPORT (Simple)
     let touchStartX = 0;
-    lightbox.addEventListener('touchstart', e => touchStartX = e.changedTouches[0].screenX);
-    lightbox.addEventListener('touchend', e => {
-        if (e.changedTouches[0].screenX < touchStartX - 50) document.querySelector('.next-lightbox').click();
-        if (e.changedTouches[0].screenX > touchStartX + 50) document.querySelector('.prev-lightbox').click();
-    });
+    if (lightbox) {
+        lightbox.addEventListener('touchstart', e => touchStartX = e.changedTouches[0].screenX);
+        lightbox.addEventListener('touchend', e => {
+            if (e.changedTouches[0].screenX < touchStartX - 50 && nextBtn) nextBtn.click();
+            if (e.changedTouches[0].screenX > touchStartX + 50 && prevBtn) prevBtn.click();
+        });
+    }
 });
 
 
@@ -368,16 +388,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const contactObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
-                
                 contactSection.classList.add('active-contact');
             } else {
-               
                 contactSection.classList.remove('active-contact');
             }
         });
     }, { threshold: 0.1 }); 
 
-    contactObserver.observe(contactSection);
+    if (contactSection) contactObserver.observe(contactSection);
 
     // 2. Desktop 3D Tilt Logic
     if (window.innerWidth > 992) {
@@ -411,6 +429,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let dustInterval;
 
     function createDust() {
+        if (!glitterBox) return;
         const colors = ['#FF0000', '#FFFFFF', '#FF8888'];
         for (let i = 0; i < 6; i++) {
             const dust = document.createElement('div');
